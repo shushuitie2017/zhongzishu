@@ -146,6 +146,9 @@ pnpm build      # 产物在 dist/
 |---|---|
 | 🐙 GitHub | [@shushuitie2017](https://github.com/shushuitie2017) |
 | 🌐 作品总览 | [bluecatbot.com](https://bluecatbot.com) |
+| 💬 微信 | 有问题、反馈、想聊两句，扫码加我 ↓ |
+
+<img src="docs/media/wechat-qr.jpg" alt="微信二维码 · 长宝" width="300">
 
 **也在做**：[GameBox](https://gamebox.bluecatbot.com) —— 74 个浏览器 3D 游戏「积木」模块，同一套 3D 底子，给编码代理组合改写。
 
