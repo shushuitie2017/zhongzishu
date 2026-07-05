@@ -7,9 +7,9 @@
 > *「一粒种子，一套滑块，长出一整片森林。」*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Three.js](https://img.shields.io/badge/Three.js-WebGPU-000000?logo=three.js&logoColor=white)](https://threejs.org)
+![Three.js](https://img.shields.io/badge/Three.js-WebGPU-000000?logo=three.js&logoColor=white)
 [![Live](https://img.shields.io/badge/▶_在线体验-zhongzishu.bluecatbot.com-2e8b57)](https://zhongzishu.bluecatbot.com)
-[![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
+![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
 
 <br>
 
@@ -132,8 +132,6 @@ pnpm build      # 产物在 dist/
 
 ## 背后的故事
 
-种子树改自开源项目 **[SeedThree](https://github.com/SkyeShark/SeedThree)**（SkyeShark，MIT）——把它做成了**中文版**：界面、物种名、文档全中文，保留拉丁学名，去掉外链，上线可玩。
-
 名字很直白：**一粒种子（Seed），长成一棵树。** 你给它一个物种和一个随机数，它替你把从种子到树冠的每一根枝条都算出来。
 
 程序化的好处，是它不占素材、不断链、无限不重样——一个 `.glb`，换个种子又是一片新森林。
@@ -173,7 +171,7 @@ pnpm build      # 产物在 dist/
 
 > *"A seed, a set of sliders, a whole forest."*
 
-**种子树 (zhongzishu)** is a browser-based **procedural tree & plant generator** built on Three.js (WebGPU) — the Chinese edition of [SeedThree](https://github.com/SkyeShark/SeedThree). Pick a species, tune the parameters, and grow a unique, textured, wind-animated 3D tree — **ten species across forest and desert, one-click glTF export, 60fps.**
+**种子树 (zhongzishu)** is a browser-based **procedural tree & plant generator** built on Three.js (WebGPU). Pick a species, tune the parameters, and grow a unique, textured, wind-animated 3D tree — **ten species across forest and desert, one-click glTF export, 60fps.**
 
 **▶ Live: [zhongzishu.bluecatbot.com](https://zhongzishu.bluecatbot.com)** (WebGPU browser — Chrome / Edge 113+)
 
@@ -182,5 +180,3 @@ pnpm install && pnpm dev     # http://localhost:5390
 ```
 
 Two generators under the hood — a Weber–Penn parametric model for broadleaves & conifers, a from-scratch dichotomous L-system for desert succulents. Fully procedural, zero external assets, exports `.glb` with per-LOD meshes and standard material extensions. **Not textured presets — every branch, leaf, and rib is computed.**
-
-MIT © SkyeShark (original SeedThree) · Chinese fork by BlueCat.
