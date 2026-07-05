@@ -1,90 +1,190 @@
 <div align="center">
 
-<img src="assets/ui/logo.png" alt="种子树" width="128" />
+# 🌱 种子树
 
-# 种子树
+<img src="docs/media/hero.png" alt="种子树 —— 浏览器里实时生成的白栎，配中文控制面板" width="820" />
 
-**面向 Web 的程序化树木与植物生成器，基于 Three.js（WebGPU）。**
+> *「一粒种子，一套滑块，长出一整片森林。」*
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Three.js](https://img.shields.io/badge/Three.js-WebGPU-000000?logo=three.js&logoColor=white)](https://threejs.org)
+[![Live](https://img.shields.io/badge/▶_在线体验-zhongzishu.bluecatbot.com-2e8b57)](https://zhongzishu.bluecatbot.com)
+[![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
+
+<br>
+
+**在浏览器里选一个物种、拖几下滑块，就长出一株独一无二、带真实贴图、随风摆动的 3D 树——十个物种横跨森林与沙漠，一键导出 `.glb`，全程 60fps。**
+
+<sub>纯程序化生成，零外部素材。基于 Three.js 的 WebGPU 渲染，新版 Chrome / Edge 直接跑（自动 WebGL2 回退）。</sub>
+
+<br>
+
+不用建模、不用找素材、不用装软件。<br>
+打开网页，选「白栎」还是「巨人柱」，调树冠、分枝、虬曲、风力，换个种子就是另一棵。<br>
+满意了，一键导出 glTF，丢进你的 Three.js / Blender / 游戏引擎。
+
+[▶ 在线体验](https://zhongzishu.bluecatbot.com) · [看效果](#看效果) · [本地运行](#本地运行) · [十个物种](#十个物种) · [工作原理](#工作原理)
 
 </div>
 
-一个完全程序化的树木/植物生成器：选一个物种、调它的参数，即可得到一株独一无二、带贴图、随风摆动的 3D 植物——可以直接丢进场景，或导出为 glTF。
+---
 
-> **状态：`v0.1.0`。** 十个物种、完整的 LOD + 导出管线、以及一个有生命的场景都已具备——但仍处早期，部分地方比较粗糙，请对毛边有所预期。
+## 看效果
 
-## 有什么
+同一个引擎，两个生态群落——**温带森林**的阔叶橡树，和**沙漠**里的巨人柱仙人掌，全部实时程序化生成、可调、可导出：
 
-- **两个生态群落、十个物种**
-  - *温带：* 白栎 · 红花槭 · 北美鹅掌楸 · 北美枫香 · 美国水青冈 · 西黄松 · 火炬松 · 花旗松
-  - *沙漠：* 短叶丝兰 · 巨人柱
-- **两套生成器。** 阔叶树与针叶树走 Weber–Penn 参数化模型；沙漠多肉走一套从零实现的二叉（dichotomous）L 系统（合并管状网格、棱脊、刺座硬刺）。
-- **真实形态。** 每个物种的分枝角度、锥化、虬曲与树冠轮廓，都是照参考照片一点点调出来的，而非通用默认值。
-- **叶片即卡片。** 基部锚定的单叶/针叶簇卡片，带背光透光（次表面散射）、穹顶法线树冠着色、逐实例风动。
-- **LOD 链 + 替身。** LOD0 完整几何 → 精简几何 LOD1 → 烘焙分支卡片 LOD2 → 两片交叉广告牌替身；替身在 Web Worker 里离线烘焙，观感永不卡顿。逐 LOD 的密度与分支修剪可调。
-- **有生命的场景。** 实例化的森林环、随风摆动的草与沙漠灌木、程序化岩石、按坡度/高度混合材质的 PBR 地形、体积感云层，以及可移动的太阳。
-- **环境音。** 每个群落一套无缝循环的风声底噪，随机穿插鸟鸣，可静音。
-- **glTF 导出。** 一键写出 `.glb`，含逐 LOD 合并网格与标准 `KHR_materials_*` 扩展（含叶片透射）。
+<p align="center">
+  <img src="docs/media/hero.png" width="49%" alt="白栎 · 温带" />
+  <img src="docs/media/saguaro.png" width="49%" alt="巨人柱 · 沙漠" />
+</p>
 
-## 运行环境
+- **选物种** → 白栎 / 红花槭 / 巨人柱 / 短叶丝兰…… 十选一
+- **调参数** → 树冠形状、分枝密度、虬曲度、叶片、风力、太阳，拖滑块实时重生
+- **换种子** → 同一物种，无限变体，没有两棵一样
+- **调 LOD** → LOD0 完整几何 → 广告牌替身，四级一条链，眼看着三角形往下掉
+- **导出** → 一键 `.glb`，含逐 LOD 网格 + 标准材质扩展
 
-需要**支持 WebGPU 的浏览器**——较新的 Chrome 或 Edge（Chrome 113+）。有自动的 WebGL2 回退，但 WebGPU 才是主路径。
+**这不是贴图预设——每一株的枝干走向、叶片朝向、棱脊硬刺，都是当场算出来的。**
 
-## 运行
+---
+
+## 在线体验
+
+**▶ [zhongzishu.bluecatbot.com](https://zhongzishu.bluecatbot.com)** —— 打开就能玩，无需安装。
+
+> 需要支持 WebGPU 的浏览器（Chrome / Edge 113+），有 WebGL2 自动回退。
+
+---
+
+## 本地运行
 
 ```bash
 pnpm install
-pnpm dev      # http://localhost:5390
+pnpm dev        # http://localhost:5390
 ```
 
-然后用控制面板选物种、改形态、重播种子、调 LOD、导出 `.glb`。拖拽可环绕视角；角落的扬声器按钮切换环境音。
+拖拽环绕视角；右侧面板选物种、调参数、导出 `.glb`；左下角喇叭切换环境音。
 
 ```bash
-pnpm build    # 产物在 dist/
-pnpm preview  # 预览构建产物
+pnpm build      # 产物在 dist/
 ```
 
-## 纹理与音频是怎么来的
+---
 
-纹理和音频都随仓库附带，克隆下来即可开箱运行——无需自行生成。但它们都是**生成的**，工具链也一并包含：
+## 它能做什么
 
-- **纹理**（树皮反照率，叶/针/刺的 alpha 卡片）由图像生成模型产出；`scripts/texture/` 下的脚本负责抠除 alpha、膨胀边缘，并派生法线/粗糙度/透光贴图。
-- **风声底噪**由生成式音频模型产出，再经 `scripts/audio/` 分析压平为无缝循环。鸟鸣为公开录音的截取片段。
+| | |
+|---|---|
+| 🌳 **十个物种、两个群落** | 温带阔叶/针叶 8 种 + 沙漠多肉 2 种，每种照参考照片调形态 |
+| 🎛️ **实时可调** | 树冠 / 分枝 / 虬曲 / 叶片 / 树皮 / 风 / 太阳，拖滑块即时重生 |
+| 🌱 **无限变体** | 换个种子就是另一棵，程序化生成不重样 |
+| 🍃 **真实叶片** | 单叶 / 针叶簇卡片 + 背光透光（次表面散射）+ 逐实例风动 |
+| 📉 **LOD 链 + 替身** | 四级 LOD（含广告牌替身），Web Worker 离线烘焙不卡顿 |
+| 🌍 **有生命的场景** | 实例化森林、草、岩石、PBR 地形、云、可移动太阳、环境音 |
+| 📦 **一键 glTF** | 导出 `.glb`（逐 LOD 网格 + `KHR_materials_*`），丢进任何引擎 |
+| 🔌 **零外部素材** | 纹理 / 音频随仓库附带，克隆即跑；纯程序化，无外链 |
 
-## 添加一个物种
+---
 
-新植物通过投入一份**预设**加一小组**生成的纹理**来添加——不用改引擎。整个流程被设计成可由编码代理驱动。三步：
+## 十个物种
 
-### 1. 写预设 —— `src/species/<名>.js`
+| | 物种 | 学名 | 群落 | 生成器 |
+|---|---|---|---|---|
+| 🔥 | **白栎** | *Quercus alba* | 温带 | Weber–Penn |
+| | 红花槭 | *Acer rubrum* | 温带 | Weber–Penn |
+| | 北美鹅掌楸 | *Liriodendron tulipifera* | 温带 | Weber–Penn |
+| | 北美枫香 | *Liquidambar styraciflua* | 温带 | Weber–Penn |
+| | 美国水青冈 | *Fagus grandifolia* | 温带 | Weber–Penn |
+| | 西黄松 | *Pinus ponderosa* | 温带 | Weber–Penn |
+| | 火炬松 | *Pinus taeda* | 温带 | Weber–Penn |
+| | 花旗松 | *Pseudotsuga menziesii* | 温带 | Weber–Penn |
+| 🌵 | **巨人柱** | *Carnegiea gigantea* | 沙漠 | L 系统 |
+| 🌵 | **短叶丝兰** | *Yucca brevifolia* | 沙漠 | L 系统 |
 
-导出一个物种对象，并在 `src/species/index.js` 里注册（import + 加进 `SPECIES` 映射）。**预设决定跑哪套生成器**——按植物类型二选一：
+想加不在列表里的树？不用改引擎——写一份预设 + 生成几张纹理即可（流程见 `docs/` 与项目 `CLAUDE.md`）。
 
-- **阔叶树与针叶树 → Weber–Penn 参数化模型。** 复制最接近的现有物种（`white-oak.js` 是模板，针叶树看 `pine.js`），照参考照片重调参数。
-- **沙漠多肉（巨人柱、短叶丝兰、丝兰等）→ 二叉 L 系统。** 它们不是"枝—叶"型的树，跑的是完全不同的生成器：设 `foliageType: 'rosette'`（或 `cactus: true`），用一套 L 系统语法描述——分叉规则（概率、深度、张开角）、段长/锥化、棱数、分枝臂门控、莲座叶或刺座硬刺布置——构建出单一合并管状网格。复制 `saguaro.js` / `joshua-tree.js`；语法、参数与网格构造见 `docs/dichotomous-generator.md`。
+---
 
-### 2. 生成纹理（图像模型 → PBR 贴图）
+## 工作原理
 
-用你的图像模型生成两张源图，再过 `scripts/texture/` 的管线。加载器按后缀自动派生贴图名，所以**命名很重要**：`<x>_albedo.png` → `<x>_normal.png`、`<x>_roughness.png`（叶片再加 `<x>_translucency.png`）。命令见 `scripts/texture/` 下各脚本。
+一株树从「一个物种预设」到「可导出的 3D 网格」，中间是这四步：
 
-### 3. 验证
+**1. 两套生成器。** 阔叶树与针叶树走 **Weber–Penn** 参数化模型（分枝角度、锥化、树冠形状照参考照片调）；沙漠多肉走一套从零实现的**二叉 L 系统**（合并管状网格、棱脊、刺座硬刺）——它们不是「枝—叶」型的树，得换套语法。
+
+**2. 叶片即卡片。** 基部锚定的单叶 / 针叶簇卡片，带背光透光、穹顶法线树冠着色、逐实例风动。
+
+**3. LOD 链 + 替身。** LOD0 完整几何 → 精简几何 LOD1 → 烘焙分支卡片 LOD2 → 两片交叉广告牌替身；替身在 Web Worker 离线烘焙，观感永不卡顿。
+
+**4. 一键导出。** 逐 LOD 网格合并写成 `.glb`，带标准 `KHR_materials_*` 扩展（含叶片透射），任何 glTF 管线都认。
+
+想深入沙漠多肉的 L 系统语法，看 [`docs/dichotomous-generator.md`](docs/dichotomous-generator.md)。
+
+---
+
+## 诚实边界
+
+- **早期 alpha（v0.1）**：能玩、能导出，但部分地方粗糙，有毛边。
+- **要 WebGPU**：主路径是 WebGPU（Chrome / Edge 113+）；WebGL2 回退可用但非最佳。
+- **不是植物学标本**：形态照参考照片调，追求「像那么回事」而非严格植物学精确。
+- **十个物种是起点**：想要别的树，自己加（写预设 + 生成纹理）。
+
+---
+
+## 背后的故事
+
+种子树改自开源项目 **[SeedThree](https://github.com/SkyeShark/SeedThree)**（SkyeShark，MIT）——把它做成了**中文版**：界面、物种名、文档全中文，保留拉丁学名，去掉外链，上线可玩。
+
+名字很直白：**一粒种子（Seed），长成一棵树。** 你给它一个物种和一个随机数，它替你把从种子到树冠的每一根枝条都算出来。
+
+程序化的好处，是它不占素材、不断链、无限不重样——一个 `.glb`，换个种子又是一片新森林。
+
+---
+
+## 关于作者 & 也在做
+
+**蓝猫 · BlueCat** —— AI-native builder，把想法快速做成能上线玩的东西。
+
+| | |
+|---|---|
+| 🐙 GitHub | [@shushuitie2017](https://github.com/shushuitie2017) |
+| 🌐 作品总览 | [bluecatbot.com](https://bluecatbot.com) |
+
+**也在做**：[GameBox](https://gamebox.bluecatbot.com) —— 74 个浏览器 3D 游戏「积木」模块，同一套 3D 底子，给编码代理组合改写。
+
+---
+
+## 许可证
+
+**MIT —— 随便用，随便改，随便造。** 基于 [SeedThree](https://github.com/SkyeShark/SeedThree)（MIT © SkyeShark）改造，按 MIT 保留原始版权声明（见 [LICENSE](LICENSE)）。随附的生成纹理 / 音频由第三方模型产出、含公开录音片段，商业再分发前请自行核对相应许可。
+
+---
+
+<div align="center">
+
+**一粒种子，一套滑块，长出一整片森林。**<br><br>
+
+▶ [**zhongzishu.bluecatbot.com**](https://zhongzishu.bluecatbot.com)
+
+<br>
+
+MIT License · 中文版 by [蓝猫 BlueCat](https://github.com/shushuitie2017) · 基于 [SeedThree](https://github.com/SkyeShark/SeedThree)
+
+</div>
+
+---
+
+## English
+
+> *"A seed, a set of sliders, a whole forest."*
+
+**种子树 (zhongzishu)** is a browser-based **procedural tree & plant generator** built on Three.js (WebGPU) — the Chinese edition of [SeedThree](https://github.com/SkyeShark/SeedThree). Pick a species, tune the parameters, and grow a unique, textured, wind-animated 3D tree — **ten species across forest and desert, one-click glTF export, 60fps.**
+
+**▶ Live: [zhongzishu.bluecatbot.com](https://zhongzishu.bluecatbot.com)** (WebGPU browser — Chrome / Edge 113+)
 
 ```bash
-pnpm dev    # 在面板里选你的物种；检查 LOD0→广告牌、风动与 GLB 导出
+pnpm install && pnpm dev     # http://localhost:5390
 ```
 
-预设进 → 纹理生成 → 注册好，它就是一个一等物种：LOD、森林实例化、风动、导出，和内置物种一模一样。
+Two generators under the hood — a Weber–Penn parametric model for broadleaves & conifers, a from-scratch dichotomous L-system for desert succulents. Fully procedural, zero external assets, exports `.glb` with per-LOD meshes and standard material extensions. **Not textured presets — every branch, leaf, and rib is computed.**
 
-## 目录结构
-
-```
-src/
-  core/        生成器（weber-penn、dichotomous）、网格化、LOD、卡片、替身、风、地形、草……
-  species/     每个植物一份预设文件
-  audio/       环境音（风声底噪 + 鸟鸣调度）
-  ui/          控制面板
-scripts/
-  texture/     图像 → alpha 抠图 → PBR/透光贴图
-  audio/       生成式音频 + 无缝循环工具
-assets/        随仓库附带的纹理与音频
-docs/          规格说明
-```
-
+MIT © SkyeShark (original SeedThree) · Chinese fork by BlueCat.
