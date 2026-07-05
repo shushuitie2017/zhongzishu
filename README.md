@@ -155,7 +155,7 @@ pnpm build      # 产物在 dist/
 
 ## 许可证
 
-**MIT —— 随便用，随便改，随便造。** 基于 [SeedThree](https://github.com/SkyeShark/SeedThree)（MIT © SkyeShark）改造，按 MIT 保留原始版权声明（见 [LICENSE](LICENSE)）。随附的生成纹理 / 音频由第三方模型产出、含公开录音片段，商业再分发前请自行核对相应许可。
+**MIT —— 随便用，随便改，随便造。**
 
 ---
 
@@ -164,10 +164,6 @@ pnpm build      # 产物在 dist/
 **一粒种子，一套滑块，长出一整片森林。**<br><br>
 
 ▶ [**zhongzishu.bluecatbot.com**](https://zhongzishu.bluecatbot.com)
-
-<br>
-
-MIT License · 中文版 by [蓝猫 BlueCat](https://github.com/shushuitie2017) · 基于 [SeedThree](https://github.com/SkyeShark/SeedThree)
 
 </div>
 
