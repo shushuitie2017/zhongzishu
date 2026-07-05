@@ -1,0 +1,323 @@
+// Maps friendly UI controls onto Weber-Penn species params, and builds the
+// lil-gui panel. Kept separate from main.js so the parameter vocabulary lives in
+// one place as we add species and controls.
+
+import GUI from 'lil-gui';
+import { mountPanelFX } from './panel-fx.js';
+
+// Crown-shape dropdown values (Weber-Penn Shape enum) — exported so species
+// control schemas can reference it.
+export const CROWN_SHAPES = {
+  '圆锥形': 0, '球形': 1, '半球形': 2, '圆柱形': 3,
+  '锥化圆柱': 4, '火焰形': 5, '倒圆锥形': 6, '趋火焰': 7,
+};
+
+// Each species declares its OWN control schema (species.controls: an array of
+// { key, name, min, max, step | dropdown, get(species), set(shaped, v) }) so a
+// broadleaf's "branch density" and a Joshua tree's "fork generations" are
+// different sliders mapped to that species' own params — no shared oak
+// vocabulary clobbering another species' branching.
+
+// ez-tree-parity ADVANCED per-level Weber-Penn dials: one slider per level for
+// each of these params, mapped straight onto species.params arrays. Only shown
+// for the broadleaf/conifer path (rosette/dichotomous species have their own
+// vocabulary + generator). `trunk` = whether index 0 (the trunk) gets a dial.
+export const ADVANCED_LEVEL_PARAMS = [
+  { key: 'downAngle',      name: '下垂角',  min: 0,    max: 135, step: 1,    trunk: false, dflt: 0 },
+  { key: 'branches',       name: '子枝数',    min: 0,    max: 60,  step: 1,    trunk: false, dflt: 0 },
+  { key: 'curveV',         name: '虬曲度',  min: 0,    max: 120, step: 1,    trunk: true,  dflt: 40 },
+  { key: 'curve',          name: '弯曲',       min: -90,  max: 90,  step: 1,    trunk: true,  dflt: 0 },
+  { key: 'length',         name: '长度 ×', min: 0.02, max: 1.5, step: 0.01, trunk: false, dflt: 0.4 },
+  { key: 'taper',          name: '锥化',       min: 0,    max: 1,   step: 0.01, trunk: true,  dflt: 1 },
+  { key: 'twist',          name: '扭转',       min: -0.5, max: 0.5, step: 0.01, trunk: true,  dflt: 0 },
+  { key: 'curveRes',       name: '分段数',    min: 2,    max: 20,  step: 1,    trunk: true,  dflt: 8 },
+  { key: 'radialSegments', name: '径向段数',    min: 3,    max: 16,  step: 1,    trunk: true,  dflt: 6 },
+];
+
+// Default friendly-control values, read from the active species' schema.
+export function controlsFromSpecies(species) {
+  const c = {
+    seed: 1, showLeaves: true, tileWorldSize: species.tileWorldSize ?? 1.5,
+    // ez-tree parity: raw per-level param overrides ({ paramKey: { level: value } })
+    // + a general growth-force tropism (strength 0 = off, tree unchanged).
+    paramOverrides: {},
+    forceDirX: species.params?.forceDir?.x ?? 0,
+    forceDirY: species.params?.forceDir?.y ?? 1,
+    forceDirZ: species.params?.forceDir?.z ?? 0,
+    forceStrength: species.params?.forceStrength ?? 0,
+    // ez-tree parity leaf/bark editing. Geometry ones (angle/start/sizeVar/quads)
+    // reshape on rebuild; material ones (tint/alphaTest/flat) update the cached
+    // material live. Defaults read from the species so a switch re-seeds them.
+    leafTint: species.foliage?.tint ?? 0xffffff,
+    leafAngle: species.foliage?.downAngle ?? 52,
+    leafStart: species.foliage?.startFrac ?? 0.1,
+    leafSizeVar: species.foliage?.sizeVar ?? 0.3,
+    leafAlpha: species.foliage?.alphaTest ?? 0.4,
+    leafQuads: species.foliage?.quads ?? 2,
+    barkTint: 0xffffff,
+    barkFlat: false,
+  };
+  for (const d of species.controls ?? []) c[d.key] = d.get(species);
+  return c;
+}
+
+// Produce a species-like object with params/foliage overridden by the controls.
+export function applySpeciesControls(species, c) {
+  const s = {
+    ...species,
+    params: structuredClone(species.params),
+    foliage: species.foliage === false ? false : { ...(species.foliage ?? {}) },
+    tileWorldSize: c.tileWorldSize ?? species.tileWorldSize,
+  };
+  for (const d of species.controls ?? []) if (d.key in c) d.set(s, c[d.key]);
+  // Advanced per-level overrides: write straight into the params arrays. Seed a
+  // full 4-length array (shallow param merge in the generator REPLACES arrays, so
+  // sparse holes would clobber the DEFAULTS) — missing slots keep the species value
+  // or the advanced default.
+  if (c.paramOverrides) {
+    for (const [key, perLevel] of Object.entries(c.paramOverrides)) {
+      if (!perLevel || !Object.keys(perLevel).length) continue;
+      const cur = Array.isArray(s.params[key]) ? s.params[key] : [];
+      const meta = ADVANCED_LEVEL_PARAMS.find((m) => m.key === key);
+      const arr = [];
+      for (let i = 0; i < 4; i++) arr[i] = cur[i] !== undefined ? cur[i] : (meta ? meta.dflt : 0);
+      for (const [lvl, v] of Object.entries(perLevel)) arr[+lvl] = v;
+      s.params[key] = arr;
+    }
+  }
+  // General growth force (ez-tree tropism vector).
+  if (c.forceStrength) {
+    s.params.forceDir = { x: c.forceDirX ?? 0, y: c.forceDirY ?? 1, z: c.forceDirZ ?? 0 };
+    s.params.forceStrength = c.forceStrength;
+  }
+  // Leaf GEOMETRY overrides (ez-tree parity) — reshape the foliage cards on rebuild.
+  // Tint/alphaTest are MATERIAL props applied live (cached material), not here.
+  if (s.foliage) {
+    if (c.leafAngle !== undefined) s.foliage.downAngle = c.leafAngle;
+    if (c.leafStart !== undefined) s.foliage.startFrac = c.leafStart;
+    if (c.leafSizeVar !== undefined) s.foliage.sizeVar = c.leafSizeVar;
+    if (c.leafQuads !== undefined) s.foliage.quads = c.leafQuads;
+  }
+  if (c.showLeaves === false) s.foliage = false;
+  return s;
+}
+
+/**
+ * @param {object} opts { speciesList, state, onChange, onRandomize, onExport, stats }
+ *   state: { speciesKey, controls }  (mutated live by the GUI)
+ *   stats: { species, seed, stems, leaves, triangles } — updated via returned api
+ */
+export function buildGUI(opts) {
+  const { speciesMap, state, sunState, envState, optState, windState, camState, onChange, onRandomize, onExport, onExportPNG, onSun, onScaleRef, onFog, onWind, onForest, onSpom, onOpt, onCamera, onLoadRebuild, onMaterialTweak } = opts;
+  const gui = new GUI({ title: '' });
+
+  // Branding header：叶形图标 + 中文文字 wordmark（原英文 wordmark 图片已弃用）。
+  const brand = document.createElement('div');
+  brand.className = 'st-brand';
+  brand.innerHTML = `
+    <img class="icon" src="/assets/ui/logo.png" onerror="this.style.display='none'">
+    <span class="wordmark" style="color:#e8eee4;font-weight:600;font-size:18px;letter-spacing:0.12em">种子树</span>`;
+  gui.domElement.prepend(brand);
+  gui.domElement.querySelector(':scope > .lil-title')?.remove(); // brand replaces the default title bar
+  mountPanelFX(gui.domElement); // living-sap-veins GPU background
+
+  const speciesNames = {};
+  for (const key of Object.keys(speciesMap)) speciesNames[speciesMap[key].name] = key;
+
+  const proxy = { species: speciesMap[state.speciesKey].name, ...state.controls };
+
+  gui.add(proxy, 'species', speciesNames).name('物种').onChange((key) => {
+    state.speciesKey = key;
+    onChange(true); // species changed → main.js resets state.controls (sync)
+    Object.assign(proxy, state.controls);
+    proxy.species = speciesMap[key].name;
+    buildParamControls(); // rebuild sliders for this species' branching type
+    buildAdvancedControls();
+    buildLeafBarkControls();
+  });
+
+  gui.add(proxy, 'seed', 1, 9999, 1).name('种子').onChange((v) => { state.controls.seed = v; onChange(); }).listen();
+  gui.add({ randomize: () => onRandomize() }, 'randomize').name('🎲 随机种子');
+
+  // Species-defined controls: rebuilt whenever the species changes so each
+  // plant exposes sliders for ITS OWN branching type.
+  const shape = gui.addFolder('形态与叶片');
+  function buildParamControls() {
+    shape.controllers.slice().forEach((ct) => ct.destroy());
+    const sp = speciesMap[state.speciesKey];
+    for (const d of sp.controls ?? []) {
+      const ct = d.dropdown
+        ? shape.add(proxy, d.key, d.dropdown)
+        : shape.add(proxy, d.key, d.min, d.max, d.step);
+      ct.name(d.name).onChange((v) => { state.controls[d.key] = v; onChange(); });
+    }
+    shape.add(proxy, 'showLeaves').name('显示叶片').onChange((v) => { state.controls.showLeaves = v; onChange(); });
+    shape.add(proxy, 'tileWorldSize', 0.6, 3.0, 0.05).name('树皮平铺（米）').onChange((v) => { state.controls.tileWorldSize = v; onChange(); });
+  }
+  buildParamControls();
+
+  // Advanced: raw per-level Weber-Penn dials (ez-tree parity). Hidden for the
+  // rosette/dichotomous species — those params don't drive their generator.
+  const advanced = gui.addFolder('高级：分支层级');
+  function buildAdvancedControls() {
+    advanced.controllers.slice().forEach((ct) => ct.destroy());
+    const sp = speciesMap[state.speciesKey];
+    const isRosette = sp.foliageType === 'rosette';
+    advanced.domElement.style.display = isRosette ? 'none' : '';
+    if (isRosette) return;
+    const levels = sp.params?.levels ?? 3;
+    const po = (state.controls.paramOverrides ||= {});
+    for (const m of ADVANCED_LEVEL_PARAMS) {
+      const lo = m.trunk ? 0 : 1;
+      for (let lvl = lo; lvl <= levels - 1; lvl++) {
+        const pk = `adv__${m.key}__${lvl}`;
+        proxy[pk] = (po[m.key]?.[lvl]) ?? sp.params?.[m.key]?.[lvl] ?? m.dflt;
+        advanced.add(proxy, pk, m.min, m.max, m.step)
+          .name(`${m.name} · L${lvl}`)
+          .onChange((v) => { (po[m.key] ||= {})[lvl] = v; onChange(); });
+      }
+    }
+    // General growth force (arbitrary tropism vector).
+    for (const axis of ['X', 'Y', 'Z']) {
+      const pk = `forceDir${axis}`;
+      advanced.add(proxy, pk, -1, 1, 0.01).name(`生长力方向 ${axis}`).onChange((v) => { state.controls[pk] = v; onChange(); });
+    }
+    advanced.add(proxy, 'forceStrength', 0, 0.12, 0.001).name('生长力强度').onChange((v) => { state.controls.forceStrength = v; onChange(); });
+  }
+  buildAdvancedControls();
+
+  // Leaves + Bark editing (ez-tree parity). A material tweak (tint/alphaTest/flat)
+  // updates the cached material live (onMaterialTweak, no rebuild); a geometry tweak
+  // (angle/start/size-variance/quads) reshapes the cards on rebuild (onChange).
+  const mtweak = (key) => (v) => { state.controls[key] = v; onMaterialTweak?.(); };
+  const geom = (key) => (v) => { state.controls[key] = v; onChange(); };
+  const leaves = gui.addFolder('叶片');
+  const bark = gui.addFolder('树皮');
+  function buildLeafBarkControls() {
+    leaves.controllers.slice().forEach((ct) => ct.destroy());
+    bark.controllers.slice().forEach((ct) => ct.destroy());
+    const sp = speciesMap[state.speciesKey];
+    const isRosette = sp.foliageType === 'rosette';
+    // Rosette species (yucca/cactus) don't use the leaf-card material, so hide the
+    // leaf editor for them; bark tint/flat still apply to their flesh material.
+    leaves.domElement.style.display = isRosette ? 'none' : '';
+    if (!isRosette) {
+      leaves.addColor(proxy, 'leafTint').name('色调').onChange(mtweak('leafTint'));
+      leaves.add(proxy, 'leafAngle', 0, 100, 1).name('角度').onChange(geom('leafAngle'));
+      leaves.add(proxy, 'leafStart', 0, 1, 0.01).name('起始位置').onChange(geom('leafStart'));
+      leaves.add(proxy, 'leafSizeVar', 0, 1, 0.01).name('大小变化').onChange(geom('leafSizeVar'));
+      leaves.add(proxy, 'leafAlpha', 0, 1, 0.01).name('透明裁切').onChange(mtweak('leafAlpha'));
+      leaves.add(proxy, 'leafQuads', { '单片': 1, '交叉（双片）': 2 }).name('广告牌').onChange(geom('leafQuads'));
+    }
+    bark.addColor(proxy, 'barkTint').name('色调').onChange(mtweak('barkTint'));
+    bark.add(proxy, 'barkFlat').name('平面着色').onChange(mtweak('barkFlat'));
+  }
+  buildLeafBarkControls();
+
+  // Optimization: LOD chain preview + switch distances + billboard bake options.
+  if (optState && onOpt) {
+    const opt = gui.addFolder('优化 / LOD');
+    opt.add(optState, 'preview', {
+      '自动（按距离）': 'auto',
+      'LOD0 — 完整细节': 0,
+      'LOD1 — 精简几何': 1,
+      'LOD2 — 烘焙卡片': 2,
+      'LOD3 — 广告牌': 3,
+    }).name('预览层级').onChange(() => onOpt('preview'));
+    opt.add(optState, 'meshQuality', 0.3, 1, 0.05).name('LOD0 网格质量').onChange(() => onOpt('rebuild'));
+    opt.add(optState, 'lod1Dist', 5, 80, 1).name('LOD1 距离（米）').onChange(() => onOpt('dist'));
+    opt.add(optState, 'lod2Dist', 15, 150, 1).name('LOD2 距离（米）').onChange(() => onOpt('dist'));
+    opt.add(optState, 'billboardDist', 30, 300, 1).name('广告牌距离（米）').onChange(() => onOpt('dist'));
+    // Triangle BUDGETS as % of LOD0 — the builder solves mesh/leaf params to hit
+    // them (HUD shows the achieved percentages). Look dials below don't change
+    // the budget, only where it's spent.
+    opt.add(optState, 'lod1Pct', 15, 85, 5).name('LOD1 预算（%）').onChange(() => onOpt('rebuild'));
+    opt.add(optState, 'lod1Density', 0.3, 1, 0.05).name('LOD1 叶片密度').onChange(() => onOpt('rebuild'));
+    opt.add(optState, 'lod1Prune', 0, 0.85, 0.05).name('LOD1 分支修剪').onChange(() => onOpt('rebuild'));
+    opt.add(optState, 'lod2Pct', 4, 40, 1).name('LOD2 预算（%）').onChange(() => onOpt('rebuild'));
+    opt.add(optState, 'lod2Density', 0.2, 1, 0.05).name('LOD2 叶片密度').onChange(() => onOpt('rebuild'));
+    opt.add(optState, 'lod2Prune', 0, 0.85, 0.05).name('LOD2 分支修剪').onChange(() => onOpt('rebuild'));
+    // Bake quality: card res/variants invalidate the card cache → rebake+rebuild.
+    opt.add(optState, 'cardRes', { '256²': 256, '512²': 512, '1024²': 1024 }).name('卡片烘焙分辨率').onChange(() => onOpt('rebuild'));
+    opt.add(optState, 'cardVariants', { 2: 2, 3: 3, 4: 4 }).name('卡片变体数').onChange(() => onOpt('rebuild'));
+    opt.add(optState, 'billboardRes', { '512²': 512, '1024²': 1024, '2048²': 2048 }).name('广告牌分辨率').onChange(() => onOpt('rebake'));
+  }
+
+  if (sunState && onSun) {
+    const env = gui.addFolder('环境');
+    env.add(sunState, 'az', 0, 360, 1).name('太阳方位角').onChange(() => onSun());
+    env.add(sunState, 'el', 5, 88, 1).name('太阳高度角').onChange(() => onSun());
+    if (windState && onWind) {
+      env.add(windState, 'strength', 0, 1, 0.05).name('风力').onChange(() => onWind());
+      env.add(windState, 'speed', 0.2, 2.5, 0.05).name('风速').onChange(() => onWind());
+    }
+    if (envState && onScaleRef) {
+      env.add(envState, 'showScaleRef').name('比例参照（1.8 米）').onChange((v) => onScaleRef(v));
+      if (onFog) env.add(envState, 'fog').name('距离雾').onChange(() => onFog());
+      if (onSpom) env.add(envState, 'spom').name('视差地形（SPOM）').onChange(() => onSpom());
+      if (onForest) env.add(envState, 'forestCount', 0, 96, 8).name('森林树木').onChange(() => onForest());
+    }
+  }
+
+  // Camera: orbit auto-rotate (ez-tree parity).
+  if (camState && onCamera) {
+    const cam = gui.addFolder('相机');
+    cam.add(camState, 'autoRotate').name('自动旋转').onChange(() => onCamera());
+    cam.add(camState, 'autoRotateSpeed', 0, 4, 0.1).name('旋转速度').onChange(() => onCamera());
+  }
+
+  gui.add({ export: () => onExport() }, 'export').name('⬇ 下载 .glb');
+  if (onExportPNG) gui.add({ png: () => onExportPNG() }, 'png').name('📷 导出 PNG');
+
+  // Save / Load preset (ez-tree parity): the whole editable state (species +
+  // curated controls + advanced per-level overrides + growth force + seed) round-
+  // trips through a small JSON file, so a tuned tree is shareable and reloadable.
+  function applyPreset(preset) {
+    const key = preset?.species;
+    if (!key || !speciesMap[key]) { console.error('[preset] unknown species:', key); return; }
+    state.speciesKey = key;
+    // Merge over fresh defaults so a preset from an older version still fills gaps.
+    state.controls = { ...controlsFromSpecies(speciesMap[key]), ...(preset.controls || {}) };
+    proxy.species = speciesMap[key].name;
+    Object.assign(proxy, state.controls);
+    buildParamControls();
+    buildAdvancedControls();
+    buildLeafBarkControls();
+    gui.controllersRecursive().forEach((c) => c.updateDisplay());
+    onLoadRebuild?.(); // main.js: biome + build for the loaded state (no controls reset)
+  }
+  const savePreset = () => {
+    const preset = { format: 'zhongzishu-preset/1', species: state.speciesKey, controls: state.controls };
+    const blob = new Blob([JSON.stringify(preset, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${speciesMap[state.speciesKey].name.replace(/\s+/g, '_')}_seed${state.controls.seed}.zhongzishu.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  const loadPreset = () => {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.json,application/json';
+    inp.onchange = async () => {
+      const f = inp.files?.[0]; if (!f) return;
+      try { applyPreset(JSON.parse(await f.text())); }
+      catch (e) { console.error('[preset] load failed:', e); }
+    };
+    inp.click();
+  };
+  const io = gui.addFolder('存取预设');
+  io.add({ save: () => savePreset() }, 'save').name('💾 保存预设');
+  io.add({ load: () => loadPreset() }, 'load').name('📂 加载预设');
+
+  // Sections start collapsed — the panel opens as a tidy list of headings.
+  gui.foldersRecursive().forEach((f) => f.close());
+
+  // Refresh proxy fields from state (e.g. after a species change) so the panel
+  // reflects the new defaults.
+  function syncFromState() {
+    proxy.species = speciesMap[state.speciesKey].name;
+    Object.assign(proxy, state.controls);
+    gui.controllersRecursive().forEach((ctrl) => ctrl.updateDisplay());
+  }
+
+  return { gui, syncFromState, applyPreset };
+}

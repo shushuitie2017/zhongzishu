@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>种子树 —— 程序化植物生成器</title>
+    <link rel="icon" type="image/png" href="/assets/ui/favicon.png" />
+    <meta name="description" content="种子树 —— 面向 Web 的程序化树木与植物生成器，基于 Three.js（WebGPU）。选物种、调参数，即得独一无二、带贴图、随风摆动的 3D 植物，可一键导出 glTF。" />
+    <link rel="canonical" href="https://zhongzishu.bluecatbot.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="种子树 —— 程序化植物生成器" />
+    <meta property="og:description" content="面向 Web 的程序化树木与植物生成器，基于 Three.js（WebGPU）。十个物种、LOD 链、glTF 导出、有生命的场景。" />
+    <meta property="og:url" content="https://zhongzishu.bluecatbot.com/" />
+    <meta property="og:image" content="https://zhongzishu.bluecatbot.com/og-cover.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="种子树 —— 程序化植物生成器" />
+    <meta name="twitter:description" content="面向 Web 的程序化树木与植物生成器，基于 Three.js（WebGPU）。" />
+    <meta name="twitter:image" content="https://zhongzishu.bluecatbot.com/og-cover.png" />
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"WebApplication","name":"种子树","url":"https://zhongzishu.bluecatbot.com/","applicationCategory":"DesignApplication","operatingSystem":"Web (WebGPU)","description":"面向 Web 的程序化树木与植物生成器，基于 Three.js（WebGPU）。","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+    </script>
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0f14; }
+      #app { position: fixed; inset: 0; }
+      #hud {
+        position: fixed; top: 12px; left: 12px; z-index: 10;
+        font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #9fb3c8; background: rgba(11,15,20,0.6);
+        padding: 8px 10px; border: 1px solid #1e2a36; border-radius: 6px;
+        pointer-events: none; white-space: pre;
+      }
+      #err {
+        position: fixed; inset: 0; display: none; place-items: center;
+        color: #ff9c9c; font: 14px/1.5 ui-monospace, monospace; padding: 24px;
+        text-align: center; background: #0b0f14;
+      }
+      /* SeedThree-themed loader — matches the options panel: opaque dark-green
+         card, living green/amber breathing border, sap-veins canvas behind. */
+      #loading {
+        position: fixed; inset: 0; z-index: 20; display: none;
+        align-items: center; justify-content: center;
+        background: radial-gradient(120% 120% at 50% 40%, rgba(11,17,10,0.82), rgba(6,10,6,0.94));
+        backdrop-filter: blur(3px);
+        color: #e8eee4; font: 13px/1.5 'Segoe UI', system-ui, sans-serif;
+        text-align: center; letter-spacing: 0.02em;
+        opacity: 1; transition: opacity 0.4s ease; /* compositor fade-out (survives main-thread block) */
+      }
+      #loading.on { display: flex; }
+      #loading.fade { opacity: 0; }
+      #loading .card {
+        position: relative; overflow: hidden;
+        display: flex; flex-direction: column; align-items: center; gap: 18px;
+        padding: 32px 44px 26px; border-radius: 16px;
+        background: #10160f; box-shadow: 0 24px 70px rgba(0,0,0,0.55);
+      }
+      #loading .card::before { /* living green→amber breathing border */
+        content: ''; position: absolute; inset: 0; border-radius: 16px; padding: 1.5px;
+        background: linear-gradient(140deg, #4e8f5a, rgba(217,164,65,0.65), #4e8f5a);
+        background-size: 300% 300%; animation: st-load-breathe 9s ease-in-out infinite;
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; z-index: 3;
+      }
+      @keyframes st-load-breathe { 0%,100% { background-position: 0% 40%; } 50% { background-position: 100% 60%; } }
+      #loading .card::after { /* readability scrim over the veins */
+        content: ''; position: absolute; inset: 0; border-radius: 16px; z-index: 1; pointer-events: none;
+        background: linear-gradient(180deg, rgba(13,19,12,0.50), rgba(13,19,12,0.80));
+      }
+      #loading .card canvas.st-fx { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 16px; z-index: 0; }
+      #loading .card > * { position: relative; z-index: 2; }
+      #loading .brand { width: 260px; max-width: 60vw; height: auto; }
+      #loading .bar {
+        position: relative;
+        width: 300px; max-width: 60vw; height: 6px; border-radius: 4px;
+        background: rgba(0,0,0,0.38); border: 1px solid rgba(120,160,120,0.28); overflow: hidden;
+      }
+      #loading .bar-fill {
+        height: 100%; width: 0%; border-radius: 4px;
+        background: linear-gradient(90deg, #4e8f5a, #6fae6a 55%, #d9a441);
+        box-shadow: 0 0 10px rgba(120,180,110,0.45); transition: width 0.25s ease;
+      }
+      /* Sliding highlight — pure transform so the COMPOSITOR keeps it moving even
+         while the main thread is blocked compiling shaders (the width bar freezes,
+         this doesn't). This is what makes the wait feel alive instead of hung. */
+      #loading .bar::after {
+        content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 42%;
+        background: linear-gradient(90deg, transparent, rgba(226,244,220,0.42), transparent);
+        transform: translateX(-120%); will-change: transform;
+        animation: st-load-shine 1.15s linear infinite;
+      }
+      @keyframes st-load-shine { to { transform: translateX(320%); } }
+      #loading .msg { min-height: 1.4em; color: #a7bba3; }
+      /* Desert biome — the loading screen goes amber/sandstone to match the UI. */
+      body.biome-desert #loading {
+        background: radial-gradient(120% 120% at 50% 40%, rgba(20,14,8,0.82), rgba(12,8,4,0.94));
+        color: #f0e8d8;
+      }
+      body.biome-desert #loading .card::before {
+        background: linear-gradient(140deg, #c08a3a, rgba(230,178,77,0.7), #c08a3a);
+        background-size: 300% 300%;
+      }
+      body.biome-desert #loading .card::after {
+        background: linear-gradient(180deg, rgba(24,17,9,0.50), rgba(24,17,9,0.80));
+      }
+      body.biome-desert #loading .bar { border-color: rgba(200,160,100,0.30); }
+      body.biome-desert #loading .bar-fill {
+        background: linear-gradient(90deg, #c08a3a, #e0b34d 55%, #f2cd70);
+        box-shadow: 0 0 10px rgba(220,170,90,0.5);
+      }
+      body.biome-desert #loading .msg { color: #c6b193; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="hud"></div>
+    <div id="err"></div>
+    <div id="loading"><div class="card"><div class="brand" style="font:600 30px/1 'Segoe UI',system-ui,sans-serif;letter-spacing:0.14em;color:#e8eee4;text-shadow:0 2px 12px rgba(120,180,110,0.35)">种子树</div><div class="bar"><div class="bar-fill"></div></div><div class="msg">加载中</div></div></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

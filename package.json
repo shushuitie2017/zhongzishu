@@ -1,0 +1,21 @@
+{
+  "name": "zhongzishu",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "种子树 —— 面向 Three.js（WebGPU）的程序化树木/植物生成器，可无限生成物种。",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 5390"
+  },
+  "dependencies": {
+    "lil-gui": "^0.21.0",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.3",
+    "vite": "^6.0.0"
+  }
+}
