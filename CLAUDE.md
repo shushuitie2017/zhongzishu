@@ -40,8 +40,14 @@ assets/             随仓库附带的纹理/音频（开箱即用）
 
 投一份预设 `src/species/<名>.js`（复制 white-oak.js / pine.js / saguaro.js 之一）+ 注册进 index.js + 生成对应纹理（`scripts/texture/`）。详见 README「添加一个物种」与 `docs/dichotomous-generator.md`。
 
+## 部署（已上线 2026-07-05）
+
+- **GitHub**：公开仓库 `shushuitie2017/zhongzishu`（main）。`.gitignore` 已排除 `servers.json`/`.env`/`.pem`。
+- **域名**：https://zhongzishu.bluecatbot.com —— **Caddy 游戏服 54.248.150.201**（servers.json 名叫 chi 但 IP 是游戏服，同 GameBox）。web root `/home/ubuntu/zhongzishu` = 本地 `dist/`。Caddy site block（`root`+`try_files {path} /index.html` SPA 回退+`file_server`，graceful reload）。SEO 94 PASS。门户 morning 区三语卡片（i-brush，挨着 GameBox）。
+- **部署命令**：`pnpm build` → `tar czf /tmp/zzs-dist.tgz --force-local -C dist .` → scp 游戏服 → `rm -rf /home/ubuntu/zhongzishu/* && tar xzf`。只改了 index.html 时可只 scp `dist/index.html`。
+- **⚠️ 部署两坑（已解决，改站时注意）**：① `logo.png`/`favicon.png` 是字面 `/assets/ui/` 路径不经 Vite 打包 → 必须放 `public/assets/ui/`（Vite 复制 public/→dist 根），否则生产 404；SEO 文件 robots/sitemap/og-cover 同理放 `public/`。② SPA 缺 `<h1>` 会让 SEO gate FAIL → body 里有个视觉隐藏 h1，别删。
+
 ## 待办（可选）
 
-- 未 git init / 未推 GitHub / 未部署（按需再做）。
 - `docs/*.md` 仍为英文开发规格（面向开发者，未中文化）。
 - `white_oak_single_dry/dryest` 季节变体贴图缺失是原项目既有的 benign 警告（非改造引入）。
